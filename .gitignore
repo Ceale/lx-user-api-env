@@ -3,3 +3,7 @@ node_modules/
 runtime/
 testset/
 test/
+lib/
+
+# Finder (MacOS) folder config
+.DS_Store
