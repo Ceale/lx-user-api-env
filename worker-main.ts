@@ -1,7 +1,7 @@
-import { Worker } from "node:worker_threads"
-import type { LX } from "lx-source-type"
 import { type anyobject } from "@ceale/util"
-import { UserApi, type IUserApi, type LxUserApiHandlers, type LxUserApiOptions } from "./user-api.ts"
+import type { LX } from "lx-source-type"
+import { Worker } from "node:worker_threads"
+import { type IUserApi, type LxUserApiHandlers, type LxUserApiOptions } from "./user-api.ts"
 
 export type ActionMessage =
     | { id: string; action: "load"; script: string, options: LxUserApiOptions }
@@ -27,6 +27,13 @@ export type EventMessage =
 export type Result<T extends anyobject = {}> = ({ success: true } & T) | { success: false, error: any }
 
 const createID = () => Math.random().toString(36).slice(2)
+// @ts-ignore
+// const WORKER_PATH = globalThis.WORKER_PATH ?? "./worker-sub.ts"
+// import fs from "node:fs"
+// const WORKER_PATH = URL.createObjectURL(new Blob([ fs.readFileSync("./worker-sub.ts", "utf8") ], { type: "application/javascript" }))
+const WORKER_PATH = "./worker-sub.ts"
+const WORKER_DATA = { isSubWorker: true }
+
 
 export class WorkerUserApi implements IUserApi {
 
@@ -155,7 +162,7 @@ export class WorkerUserApiManager {
         if (this.mode === "dedicated") {
             this.multiWorkerMap = new Map()
         } else {
-            this.singleWorker = new Worker("./worker-sub.ts")
+            this.singleWorker = new Worker(WORKER_PATH, { workerData: WORKER_DATA })
         }
     }
 
@@ -165,7 +172,7 @@ export class WorkerUserApiManager {
         options: LxUserApiOptions = {}
     ): WorkerUserApi {
         if (this.mode === "dedicated") {
-            const worker = new Worker("./worker-sub.ts")
+            const worker = new Worker(WORKER_PATH, { workerData: WORKER_DATA })
             const userApi = new WorkerUserApi(script, worker, handlers, options)
             const destroy = userApi.destroy
             userApi.destroy = () => {

@@ -1,6 +1,5 @@
-import { workerData, parentPort } from "node:worker_threads"
 import type { LX } from "lx-source-type"
-import { assert } from "@ceale/util"
+import { parentPort, workerData } from "node:worker_threads"
 import { UserApi, type LxUserApiHandlers, type LxUserApiOptions } from "./user-api.ts"
 import type { ActionMessage, EventMessage } from "./worker-main.ts"
 
@@ -82,4 +81,7 @@ export class UserApiWorkerHost {
             })
     }
 }
-new UserApiWorkerHost()
+
+if (workerData?.isSubWorker) {
+    new UserApiWorkerHost().toString()
+}
