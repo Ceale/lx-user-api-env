@@ -12,7 +12,7 @@ import { build, BuildConfig } from "bun"
 //     .text()
 
 const config: BuildConfig = {
-    entrypoints: [ "index.ts", "worker-sub.ts" ],
+    entrypoints: [ "index.ts", "worker-host.ts" ],
     target: "node",
     packages: "external",
     define: {

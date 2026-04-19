@@ -18,6 +18,10 @@ jobs:
     steps:
       # 拉取仓库
       - uses: actions/checkout@v5
+      # 构建
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
       # 发布
       - uses: actions/setup-node@v4
         with:
