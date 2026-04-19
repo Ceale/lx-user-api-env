@@ -27,6 +27,6 @@
     "@types/needle": "^3.3.0",
     "@types/node": "^25.5.0",
     "@typescript/native-preview": "^7.0.0-dev.20260413.1",
-    "lx-source-type": "^2.0.4"
+    "lx-source-type": "^2.0.5"
   }
 }

@@ -1,7 +1,7 @@
 import type { LX } from "lx-source-type"
 import { parentPort, workerData } from "node:worker_threads"
 import { UserApi, type LxUserApiHandlers, type LxUserApiOptions } from "./user-api.ts"
-import type { ActionMessage, EventMessage } from "./worker-main.ts"
+import type { ActionMessage, EventMessage } from "./worker-mgr.ts"
 
 export class UserApiWorkerHost {
 
@@ -47,8 +47,8 @@ export class UserApiWorkerHost {
             onRunError: (error) => {
                 this.sendMessage({ event: "runError", id, error })
             },
-            onLog: (...data) => {
-                this.sendMessage({ event: "log", id, data })
+            onLog: (level, ...data) => {
+                this.sendMessage({ event: "log", id, level, data })
             }
         } satisfies LxUserApiHandlers
         const userapi = new UserApi(script, handlers, options)

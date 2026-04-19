@@ -15,6 +15,7 @@
     "outDir": "./lib/types",
 
     // Some stricter flags (disabled by default)
+    "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false

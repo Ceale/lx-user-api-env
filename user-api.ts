@@ -1,18 +1,26 @@
 import { type anyobject } from "@ceale/util"
 import type { LX } from "lx-source-type"
 import vm from "node:vm"
-import { extractMetadata, request, createUtils } from "./env.ts"
-import type { Result } from "./worker-main.ts"
+import { extractMetadata, createUtils, request } from "./env.ts"
+import type { Result } from "./worker-mgr.ts"
+import { TimerClass } from "./env.ts"
 
 export interface LxUserApiHandlers {
     onInited?: (payload: LX.InitedPayload) => void
     onUpdateAlert?: (payload: LX.UpdateAlertPayload) => void
-    onLog?: (...data: any) => void
+    onLog?: (level: string, ...data: any) => void
     onInitError?: (error: any) => void
     onRunError?: (error: any) => void
 }
 
 export interface LxUserApiOptions {
+    /** 传递给`lx.env`的值，默认为`mobile` */
+    env?: LX.API["env"]
+    /** 传递给`lx.version`的值，当前为`2.0.0` */
+    version?: LX.API["version"]
+    /** 脚本执行超时时间，对应 `node:vm` `timeout` 选项，默认为10秒 */
+    timeout?: number | undefined
+    /** 调试模式，开启后将打印 请求、日志、事件  */
     debug?: boolean
 }
 
@@ -21,16 +29,18 @@ export interface IUserApi {
     isInitError: boolean
     isUpdateNeeded: boolean
     isDestroyed: boolean
+    waitInit(): Promise<void>
     
     supportPlatform?: LX.InitedPayload["sources"]
     updateAlert?: LX.UpdateAlertPayload
+    initError?: any
     
-    handlers: LxUserApiHandlers
+    handlers: LxUserApiHandlers 
     resolve(params: LX.ProviderParams): Promise<Result<{ result: LX.ProviderResult }>>
     destroy(): void
 }
 
-export class UserApi implements IUserApi{
+export class UserApi implements IUserApi {
 
     public isInited = false
     public isInitError = false
@@ -46,11 +56,16 @@ export class UserApi implements IUserApi{
         request: "request", 
         updateAlert: "updateAlert"
     }
+    private lxApi: LX.API
+    private context: anyobject
 
     private provider?: Function
 
     public handlers: LxUserApiHandlers
     private options: LxUserApiOptions
+
+    private timer = new TimerClass()
+    private initPromise: Promise<void>
 
     constructor(
         script: string,
@@ -59,27 +74,35 @@ export class UserApi implements IUserApi{
     ) {
         this.handlers = handlers
         this.options = options
-
+        
         const scriptInfo = extractMetadata(script)
-        const EVENT_NAMES = this.EVENT_NAMES
+        
+        let initResolve: () => void
+        this.initPromise = new Promise(resolve => {
+            initResolve = resolve
+        })
+
         const innerOn: LX.OnEvent = async (eventName, handler) => {
+            if (this.isDestroyed) throw new Error("UserApi destroyed")
             if (options.debug) console.log("on", eventName)
-            if (eventName === EVENT_NAMES.request) {
+            if (eventName === this.EVENT_NAMES.request) {
                 this.provider = handler
             } else {
                 throw new Error("Unsupported event name " + eventName)
             }
         }
         const innerSend: LX.SendEvent = async (eventName, data: any) => {
+            if (this.isDestroyed) throw new Error("UserApi destroyed") 
             if (options.debug) console.log("send", eventName)
-            if (this.isDestroyed) return
             switch (eventName) {
-                case EVENT_NAMES.inited:
+                case this.EVENT_NAMES.inited:
                     this.isInited = true
                     this.supportPlatform = data.sources
+                    initResolve()
                     this.handlers.onInited?.(data)
                     break
-                case EVENT_NAMES.updateAlert:
+                case this.EVENT_NAMES.updateAlert:
+                    if (this.isUpdateNeeded) throw new Error("Allow only one update alert")
                     this.isUpdateNeeded = true
                     this.updateAlert = data
                     this.handlers.onUpdateAlert?.(data)
@@ -88,66 +111,102 @@ export class UserApi implements IUserApi{
                     throw new Error("Unsupported event name " + eventName)
             }
         }
-        const innerRrequest: LX.Request = options.debug
-            ? (...args1) => request(
-                args1[0], args1[1], 
-                (...args2) => {
-                    console.log("request", ...args1, ...args2)
-                    args1[2](...args2)
-                }
-            )
-            : request
-        // const innerRrequest = request
-        const innerLog = options.debug
-            ? (...args: any) => {
-                console.log("log", ...args)
-                this.handlers.onLog?.(...args)
-            } : this.handlers.onLog ?? (() => {})
-        // const innerLog = handlers.onLog ?? (() => {})
-        const lxApi: LX.API = {
-            version: "2.0.0",
-            env: "desktop",
+
+        this.lxApi = {
+            env: options?.env ?? "mobile",
+            version: options?.version ?? "2.0.0",
             currentScriptInfo: scriptInfo,
-            EVENT_NAMES,
+            EVENT_NAMES: this.EVENT_NAMES,
             on: innerOn,
             send: innerSend,  
-            request: innerRrequest,
+            request: request,
             utils: createUtils()
         }
-        const content: anyobject = {
-            lx: lxApi,
-            console: { log: innerLog },
-            setTimeout: global.setTimeout,
-            clearTimeout: global.clearTimeout,
-            setInterval: global.setInterval,
-            clearInterval: global.clearInterval
-        }
-        Object.setPrototypeOf(content, null)
-        try {
-            vm.runInNewContext(script, content, {
-                // filename:
-                // contextName:
-                timeout: 10_000,
-                contextCodeGeneration: {
-                    strings: false,
-                    wasm: false
-                },
-                importModuleDynamically() {
-                    // if (options.debug) console.log("Unsupported dynamic import")
-                    throw new Error("Unsupported dynamic import")
+
+        const createInnerLog = (level: string) => {
+            if (options.debug) {
+                return (...args: any) => {
+                    console.log(`log(${level})`, ...args)
+                    this.handlers.onLog?.(level, ...args)
                 }
-            })
-        } catch (error) {
-            if (!this.isInited) {
-                if (this.options.debug) console.log("initError", error)
-                this.isInitError = true
-                this.destroy()
-                this.handlers.onInitError?.(error)
             } else {
-                if (this.options.debug) console.log("runError", error)
-                this.handlers.onRunError?.(error)
+                return handlers?.onLog
+                    ? (...data) => handlers.onLog?.(level, ...data)
+                    : (() => {})
             }
         }
+        const innerConsole = [ "log", "debug", "info", "warn", "error" ]
+            .reduce((acc, key) => {
+                acc[key] = createInnerLog(key)
+                return acc
+            }, {})
+
+        this.context = {
+            lx: this.lxApi,
+            console: innerConsole,
+            setTimeout: this.timer.setTimeout,
+            clearTimeout: this.timer.clearTimeout,
+            setInterval: this.timer.setInterval,
+            clearInterval: this.timer.clearInterval
+        }
+        // Object.setPrototypeOf(content, null) 
+
+        const deleteApiCode = `
+            delete globalThis.SuppressedError;
+            delete globalThis.Float16Array;
+            delete globalThis.Iterator;
+            delete globalThis.SharedArrayBuffer;
+            delete globalThis.DisposableStack;
+            delete globalThis.AsyncDisposableStack;
+            delete globalThis.WeakRef;
+            delete globalThis.FinalizationRegistry;
+            delete globalThis.Intl;
+            delete globalThis.ShadowRealm;
+            delete globalThis.WebAssembly;
+        `
+        const code = [ deleteApiCode, script ].join("\n")
+
+        queueMicrotask(() => {
+            const timeout = this.options.timeout ?? 10_000
+            // if (timeout !== undefined) setTimeout(() => {
+            //     if (!this.isInited) {
+            //         this.isInitError = true
+            //         this.destroy()
+            //         initResolve()
+            //         this.handlers.onInitError?.(new Error("Timeout"))
+            //     }
+            // }, timeout)
+            try {
+                vm.runInNewContext(code, this.context, {
+                    // filename:
+                    // contextName:
+                    // lineOffset: 10,
+                    timeout,
+                    contextCodeGeneration: {
+                        strings: false,
+                        wasm: false
+                    },
+                    importModuleDynamically() {
+                        throw new Error("Unsupported dynamic import")
+                    }
+                })
+            } catch (error) {
+                if (!this.isInited) {
+                    if (this.options.debug) console.log("initError", error)
+                    this.isInitError = true
+                    this.destroy()
+                    initResolve()
+                    this.handlers.onInitError?.(error)
+                } else {
+                    if (this.options.debug) console.log("runError", error)
+                    this.handlers.onRunError?.(error)
+                }
+            }
+        })
+    }
+
+    async waitInit(): Promise<void> {
+        return this.initPromise
     }
 
     async resolve(params: LX.ProviderParams): Promise<Result<{ result: LX.ProviderResult }>> {
@@ -165,5 +224,6 @@ export class UserApi implements IUserApi{
         this.isDestroyed = true
         this.provider = undefined
         this.handlers = {}
+        this.timer.clear()
     }
 }

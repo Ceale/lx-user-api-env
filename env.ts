@@ -15,8 +15,8 @@ export const extractMetadata = (script: string): LX.ScriptInfo => {
         .map(line => line.split("@")[1].trim())
         .forEach(line => {
             let state = 0
-            const keyChars = []
-            const valueChars = []
+            const keyChars = [] as any
+            const valueChars = [] as any
             // 0:in key, 1:in gap, 2:in value
             for (const char of line) {
                 if (state === 0 && char === " ") {
@@ -129,3 +129,42 @@ export const createUtils: () => LX.Utils = () => ({
         },
     },
 })
+
+export class TimerClass {
+    private isClear = false;
+    private timeout = new Set<any>();
+    private interval = new Set<any>();
+
+    setTimeout = (...args: Parameters<typeof setTimeout>) => {
+        if (this.isClear) return
+        const id = globalThis.setTimeout(...args)
+        this.timeout.add(id)
+        return id
+    };
+    clearTimeout = (...args: Parameters<typeof clearTimeout>) => {
+        if (this.isClear) return
+        const id = args[0]
+        this.timeout.delete(id)
+        return globalThis.clearTimeout(...args)
+    };
+    setInterval = (...args: Parameters<typeof setInterval>) => {
+        if (this.isClear) return
+        const id = globalThis.setInterval(...args)
+        this.interval.add(id)
+        return id
+    };
+    clearInterval = (...args: Parameters<typeof clearInterval>) => {
+        if (this.isClear) return
+        const id = args[0]
+        this.interval.delete(id)
+        return globalThis.clearInterval(...args)
+    };
+    clear = () => {
+        this.isClear = true
+        this.timeout.forEach(id => globalThis.clearTimeout(id))
+        this.interval.forEach(id => globalThis.clearInterval(id))
+        this.timeout.clear()
+        this.interval.clear()
+    };
+}
+
