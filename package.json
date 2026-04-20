@@ -1,6 +1,6 @@
 {
   "name": "lx-user-api-env",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": "Ceale",
   "license": "MIT",
   "repository": "https://github.com/Ceale/lx-user-api-env.git",
@@ -15,7 +15,7 @@
     ".": {
       "types": "./lib/types/index.d.ts",
       "require": "./lib/cjs/index.js",
-      "import": "./lib/esm/index.mjs"
+      "import": "./lib/esm/index.js"
     }
   },
   "dependencies": {
