@@ -1,7 +1,7 @@
 import type { LX } from "lx-source-type"
 import type { Worker } from "node:worker_threads"
-import type { IUserApi, LxUserApiHandlers, LxUserApiOptions } from "./user-api"
-import { createID, type EventMessage, type ActionMessage, type Result } from "./worker-mgr"
+import type { IUserApi, LxUserApiHandlers, LxUserApiOptions } from "./user-api.ts"
+import { createID, type EventMessage, type ActionMessage, type Result } from "./worker-mgr.ts"
 
 export class WorkerUserApi implements IUserApi {
 
@@ -19,10 +19,10 @@ export class WorkerUserApi implements IUserApi {
     private wid = createID();
     private worker: Worker // | null
     private resolveMap = new Map<string, Function>();
+    private initResolve!: Function
     private initPromise = new Promise<void>(resolve => {
         this.initResolve = resolve
     });
-    private initResolve!: Function
 
     constructor(
         script: string,

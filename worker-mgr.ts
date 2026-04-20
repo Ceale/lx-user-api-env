@@ -29,7 +29,7 @@ export type Result<T extends anyobject = {}> = ({ success: true } & T) | { succe
 
 export const createID = () => Math.random().toString(36).slice(2)
 
-const WORKER_PATH = "./worker-host.ts"
+const WORKER_PATH = new URL("./worker-host.js", import.meta.url)
 const WORKER_DATA = { isSubWorker: true }
 
 
