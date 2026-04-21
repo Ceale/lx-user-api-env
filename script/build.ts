@@ -2,7 +2,7 @@ import { build, BuildConfig } from "bun"
 
 // const workerString = await (
 //         await build({
-//             entrypoints: [ "worker-sub.ts" ],
+//             entrypoints: [ "worker-host.ts" ],
 //             target: "node",
 //             format: "esm",
 //             packages: "external"
@@ -16,9 +16,8 @@ const config: BuildConfig = {
     target: "node",
     packages: "external",
     define: {
-        // "globalThis.WORKER_PATH": JSON.stringify("data:text/javascript," + encodeURIComponent(workerString))
-        // "globalThis.WORKER_PATH": JSON.stringify("data:text/javascript;base64," + Buffer.from(workerString).toBase64())
-        // "globalThis.WORKER_PATH": JSON.stringify(workerString)
+        "import.meta.IS_BUILDED": JSON.stringify(true),
+        // "import.meta.WORKER_FILE": JSON.stringify(workerString)
     }
 }
 
@@ -28,8 +27,8 @@ await build({
     outdir: "lib/esm/",
 })
 
-await build({
-    ...config,
-    format: "cjs",
-    outdir: "lib/cjs/",
-})
+// await build({
+//     ...config,
+//     format: "cjs",
+//     outdir: "lib/cjs/",
+// })

@@ -82,6 +82,6 @@ export class UserApiWorkerHost {
     }
 }
 
-if (workerData?.isSubWorker) {
-    new UserApiWorkerHost().toString()
+if (workerData?.isUserApiWorkerHost) {
+    new UserApiWorkerHost()
 }

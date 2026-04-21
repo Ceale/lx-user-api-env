@@ -29,9 +29,35 @@ export type Result<T extends anyobject = {}> = ({ success: true } & T) | { succe
 
 export const createID = () => Math.random().toString(36).slice(2)
 
-const WORKER_PATH = new URL("./worker-host.js", import.meta.url)
-const WORKER_DATA = { isSubWorker: true }
-
+// import { dirname, join } from "node:path"
+// import { fileURLToPath } from "node:url"
+// import { existsSync } from "fs"
+// import { mkdirSync, writeFileSync } from "node:fs"
+// import { tmpdir } from "node:os"
+const WORKER_PATH = (() => {
+    // @ts-ignore
+    if (import.meta.IS_BUILDED) {
+        // const path1 = fileURLToPath(new URL("worker-host.js", import.meta.url))
+        // if (existsSync(path1)) {
+        //     return path1
+        // } else {
+        //     // @ts-ignore
+        //     const file = import.meta.WORKER_FILE
+        //     const path3 = fileURLToPath(new URL(".lx-user-api-env/worker-host.js", import.meta.url))
+        //     try {
+        //         mkdirSync(dirname(path3), { recursive: true })
+        //         writeFileSync(path3, file, "utf8")
+        //         return path3
+        //     } catch (error) {
+        //         return new URL("data:application/javascript;base64," + Buffer.from(file).toString("base64"))
+        //     }
+        // }
+        return new URL("worker-host.js", import.meta.url)
+    } else {
+        return "./worker-host.ts"
+    }
+})()!
+const WORKER_DATA = { isUserApiWorkerHost: true }
 
 export class WorkerUserApiManager {
 

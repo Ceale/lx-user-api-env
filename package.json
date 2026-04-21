@@ -1,13 +1,13 @@
 {
   "name": "lx-user-api-env",
   "version": "0.1.6",
+  "type": "module",
   "author": "Ceale",
   "license": "MIT",
   "repository": "https://github.com/Ceale/lx-user-api-env.git",
-  "type": "module",
   "scripts": {
-    "build": "bun 'build:cjs&esm' && bun build:type",
-    "build:cjs&esm": "bun script/build.ts",
+    "build": "bun 'build:esm' && bun build:type",
+    "build:esm": "bun script/build.ts",
     "build:type": "tsgo"
   },
   "files": ["lib"],
